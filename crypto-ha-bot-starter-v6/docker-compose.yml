@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  bot:
+    build: ./bot
+    env_file: .env
+    volumes:
+      - ./bot:/app
+    depends_on:
+      - db
+    restart: unless-stopped
+  db:
+    image: mariadb:10.9
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: crypto
+      MYSQL_USER: crypto_user
+      MYSQL_PASSWORD: cryptopass
+    volumes:
+      - db_data:/var/lib/mysql
+volumes:
+  db_data:
