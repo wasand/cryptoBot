@@ -62,5 +62,3 @@ crypto-ha-bot-starter-v6/
 - Kolektory danych dla fiat, akcji i kryptowalut.
 - System logów w bazie.
 
----
-**Autor:** Starter wygenerowany automatycznie przez ChatGPT dla projektu Crypto HA Bot.
