@@ -1,0 +1,8 @@
+- platform: rest
+  resource: http://crypto-bot:8000/health
+  name: Crypto Bot Status
+  value_template: "{{ value_json.status }}"
+  json_attributes:
+    - running
+    - autotrade
+    - pairs

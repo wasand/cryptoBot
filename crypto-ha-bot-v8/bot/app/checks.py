@@ -14,7 +14,6 @@ def check_binance():
     return len(exch.get("symbols", []))
 
 def is_quote_allowed(pair: str) -> bool:
-    # Na końcu pary zwykle jest quote (np. BTCUSDC -> USDC)
     for q in settings.ALLOWED_QUOTES:
         if pair.endswith(q):
             return True

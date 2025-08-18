@@ -1,11 +1,12 @@
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import DateTime, Integer, String, Text, Boolean, Float
+from sqlalchemy import DateTime, Integer, String, Text, Boolean, Float, Date
 from datetime import datetime
 from .database import Base
 
 class MarketData(Base):
     __tablename__ = "market_data"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    batch_id: Mapped[str] = mapped_column(String(36), index=True)
     ts: Mapped[datetime] = mapped_column(DateTime, index=True, default=datetime.utcnow)
     pair: Mapped[str] = mapped_column(String(16), index=True)
     price: Mapped[float] = mapped_column(Float)
@@ -13,6 +14,8 @@ class MarketData(Base):
     trades_per_hour: Mapped[int] = mapped_column(Integer, default=0)
     ema_fast: Mapped[float | None] = mapped_column(Float, nullable=True)
     ema_slow: Mapped[float | None] = mapped_column(Float, nullable=True)
+    macd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    atr: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 class Package(Base):
     __tablename__ = "packages"
@@ -59,17 +62,18 @@ class Alert(Base):
     pair: Mapped[str] = mapped_column(String(16), index=True)
     pnl_usd: Mapped[float] = mapped_column(Float)
     pnl_percent: Mapped[float] = mapped_column(Float)
-    type: Mapped[str] = mapped_column(String(16))  # positive/negative
+    type: Mapped[str] = mapped_column(String(16))
 
 class PairConfig(Base):
     __tablename__ = "pair_config"
     pair: Mapped[str] = mapped_column(String(16), primary_key=True)
     allowed: Mapped[bool] = mapped_column(Boolean, default=True)
-    risk_level: Mapped[int] = mapped_column(Integer, default=5)  # 0..10
+    risk_level: Mapped[int] = mapped_column(Integer, default=5)
 
 class FxRate(Base):
     __tablename__ = "fx_rates"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    batch_id: Mapped[str] = mapped_column(String(36), index=True)
     ts: Mapped[datetime] = mapped_column(DateTime, index=True, default=datetime.utcnow)
     base: Mapped[str] = mapped_column(String(8))
     quote: Mapped[str] = mapped_column(String(8))
@@ -78,6 +82,25 @@ class FxRate(Base):
 class EquityPrice(Base):
     __tablename__ = "equity_prices"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    batch_id: Mapped[str] = mapped_column(String(36), index=True)
     ts: Mapped[datetime] = mapped_column(DateTime, index=True, default=datetime.utcnow)
     symbol: Mapped[str] = mapped_column(String(16), index=True)
     price: Mapped[float] = mapped_column(Float)
+
+class StockPortfolio(Base):
+    __tablename__ = "stock_portfolios"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    batch_id: Mapped[str] = mapped_column(String(36), index=True)
+    fund_name: Mapped[str] = mapped_column(String(100))
+    symbol: Mapped[str] = mapped_column(String(16), index=True)
+    shares: Mapped[int] = mapped_column(Integer)
+    value_usd: Mapped[float] = mapped_column(Float)
+    report_date: Mapped[date] = mapped_column(Date)
+
+class MLFeature(Base):
+    __tablename__ = "ml_features"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    batch_id: Mapped[str] = mapped_column(String(36), index=True)
+    ts: Mapped[datetime] = mapped_column(DateTime, index=True, default=datetime.utcnow)
+    feature_name: Mapped[str] = mapped_column(String(64))
+    value: Mapped[str] = mapped_column(Text)

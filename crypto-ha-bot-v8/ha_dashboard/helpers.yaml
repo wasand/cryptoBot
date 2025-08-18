@@ -1,0 +1,4 @@
+input_boolean:
+  crypto_bot_autotrade:
+    name: Crypto Bot Autotrade
+    initial: false

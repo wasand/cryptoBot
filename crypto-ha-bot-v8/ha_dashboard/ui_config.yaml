@@ -1,0 +1,5 @@
+type: custom:crypto-bot-card
+backend_url: "http://crypto-bot:8000"
+pairs:
+  - BTCUSDC
+  - ETHUSDC

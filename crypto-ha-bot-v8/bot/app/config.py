@@ -13,7 +13,7 @@ class Settings:
 
     DB_HOST = os.getenv("DB_HOST","localhost")
     DB_PORT = int(os.getenv("DB_PORT","3306"))
-    DB_NAME = os.getenv("DB_NAME","crypto_bot")
+    DB_NAME = os.getenv("DB_NAME","crypto_bot_db")
     DB_USER = os.getenv("DB_USER","crypto_bot")
     DB_PASSWORD = os.getenv("DB_PASSWORD","")
 
@@ -34,9 +34,9 @@ class Settings:
     ALERT_PNL_NEGATIVE = float(os.getenv("ALERT_PNL_NEGATIVE","-5"))
 
     FX_ENABLED = getenv_bool("FX_ENABLED", True)
-    EQUITIES_ENABLED = getenv_bool("EQUITIES_ENABLED", False)
+    EQUITIES_ENABLED = getenv_bool("EQUITIES_ENABLED", True)
 
     API_BIND = os.getenv("API_BIND","0.0.0.0")
-    API_PORT = int(os.getenv("API_PORT","8080"))
+    API_PORT = int(os.getenv("API_PORT","8000"))
 
 settings = Settings()

@@ -1,8 +1,15 @@
 from .binance_client import get_client
 from .database import get_session
-from .models import Package
+from .models import Package, FxRate
 from .logger import log
 from datetime import datetime
+from sqlalchemy import select
+
+def get_latest_fx_rate(quote: str = "PLN") -> float:
+    s = get_session()
+    rate = s.execute(select(FxRate.rate).where(FxRate.quote==quote).order_by(FxRate.ts.desc()).limit(1)).scalar()
+    s.close()
+    return float(rate) if rate else 4.0
 
 def market_buy_package(pair: str, quote_amount_usd: float):
     client = get_client()
@@ -27,7 +34,6 @@ def market_buy_package(pair: str, quote_amount_usd: float):
 def market_sell_package(package_id: int, pair: str, qty: float):
     client = get_client()
     order = client.new_order(symbol=pair, side='SELL', type='MARKET', quantity=str(qty))
-    # Ustal cenę egzekucji
     price = None
     if order.get('fills'):
         total = sum(float(f['price']) * float(f['qty']) for f in order['fills'])
@@ -42,7 +48,8 @@ def market_sell_package(package_id: int, pair: str, qty: float):
         pkg.exit_price = price or pkg.entry_price
         pkg.sold_at = datetime.utcnow()
         pkg.realized_pnl_usd = (pkg.exit_price - pkg.entry_price) * pkg.quantity
+        pkg.realized_pnl_pln = pkg.realized_pnl_usd * get_latest_fx_rate("PLN")
         s.commit()
-        log(pair, f"SPRZEDAŻ pakietu: id={pkg.id} qty={pkg.quantity:.8f}, exit={pkg.exit_price:.6f}, pnl={pkg.realized_pnl_usd:.2f} USD", "INFO", pnl_usd=pkg.realized_pnl_usd)
+        log(pair, f"SPRZEDAŻ pakietu: id={pkg.id} qty={pkg.quantity:.8f}, exit={pkg.exit_price:.6f}, pnl={pkg.realized_pnl_usd:.2f} USD, {pkg.realized_pnl_pln:.2f} PLN", "INFO", pnl_usd=pkg.realized_pnl_usd)
     s.close()
     return {"order": order}
