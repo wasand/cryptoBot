@@ -1,22 +1,18 @@
+from .checks import check_db, check_binance
 from .config import settings
-from .database import engine
-from .binance_client import get_client
-from sqlalchemy import text
 
 def main():
     print("== Checking DB connection ==")
     try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+        check_db()
         print("OK: MariaDB connected")
     except Exception as e:
         print("ERROR: MariaDB", e); return
 
-    print("== Checking Binance Testnet ==")
+    print("== Checking Binance (testnet=%s) ==" % settings.BINANCE_TESTNET)
     try:
-        client = get_client()
-        exch = client.exchange_info()
-        print("OK: Binance reachable, symbols:", len(exch.get("symbols", [])))
+        n = check_binance()
+        print(f"OK: Binance reachable, symbols: {n}")
     except Exception as e:
         print("ERROR: Binance", e); return
 
