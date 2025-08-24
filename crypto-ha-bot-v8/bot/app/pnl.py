@@ -1,5 +1,5 @@
 from .database import get_session
-from .models import MarketData, FxRate
+from .models import MarketData, FXRate
 from sqlalchemy import select, func
 
 def latest_price(pair: str) -> float | None:
@@ -29,6 +29,6 @@ def last_tph(pair: str) -> int:
 
 def latest_fx_rate(quote: str = "PLN") -> float:
     s = get_session()
-    rate = s.execute(select(FxRate.rate).where(FxRate.quote==quote).order_by(FxRate.ts.desc()).limit(1)).scalar()
+    rate = s.execute(select(FXRate.rate).where(FXRate.quote==quote).order_by(FXRate.ts.desc()).limit(1)).scalar()
     s.close()
     return float(rate) if rate else 4.0

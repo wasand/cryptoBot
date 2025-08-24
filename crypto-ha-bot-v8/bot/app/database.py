@@ -5,8 +5,11 @@ from .config import settings
 class Base(DeclarativeBase): pass
 
 def make_db_url():
-    return f"mysql+pymysql://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
+    return f"mysql+pymysql://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}?ssl_disabled=true"
 
-engine = create_engine(make_db_url(), pool_pre_ping=True, pool_recycle=3600, pool_size=5, max_overflow=10)
+engine = create_engine(make_db_url(), pool_pre_ping=True, pool_recycle=3600, pool_size=5)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
-def get_session(): return SessionLocal()
+
+def get_session():
+    return SessionLocal()
+

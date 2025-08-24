@@ -12,6 +12,7 @@ from .logger import log, add_alert
 from .pnl import latest_price, last_points, peak_since, last_tph, latest_fx_rate
 from .checks import is_quote_allowed
 from .orders import market_buy_package, market_sell_package
+from sqlalchemy import select, insert
 import uuid
 
 app = FastAPI(title="Crypto HA Bot v8.5", version="8.5")
@@ -25,6 +26,18 @@ app.add_middleware(
 )
 
 Base.metadata.create_all(bind=engine)
+
+async def init_pairs():
+    with get_session() as session:
+        for pair in settings.DEFAULT_PAIRS:
+            stmt = select(PairConfig).where(PairConfig.pair == pair)
+            result = session.execute(stmt).scalar_one_or_none()
+            if not result:
+                session.execute(
+                    insert(PairConfig),
+                    {"pair": pair, "allowed": True, "risk_level": 0}
+                )
+                session.commit()
 
 running = False
 autotrade = settings.AUTO_TRADE
@@ -58,14 +71,14 @@ class PairCfgBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status":"ok","running":running, "autotrade": autotrade, "pairs": settings.DEFAULT_PAIRS}
+    return {"status": "ok", "running": running, "autotrade": autotrade, "pairs": settings.DEFAULT_PAIRS}
 
 @app.post("/start")
-def start_bot(body: StartBody | None=None):
+def start_bot(body: StartBody | None = None):
     global running, autotrade
     running = True
     if body:
-        if body.pairs:
+        if body.pairs and len(body.pairs) > 0 and body.pairs != ["string"]:
             settings.DEFAULT_PAIRS = [p.upper() for p in body.pairs if is_quote_allowed(p.upper())]
         if body.autotrade is not None:
             autotrade = body.autotrade
@@ -95,13 +108,13 @@ def sell(body: SellBody):
         raise HTTPException(400, "Invalid pair")
     s = get_session()
     if body.package_id:
-        pkg = s.query(Package).filter(Package.id==body.package_id).first()
+        pkg = s.query(Package).filter(Package.id == body.package_id).first()
         if not pkg or pkg.sold_at:
             s.close()
             raise HTTPException(400, "Invalid or sold package")
         result = market_sell_package(body.package_id, body.pair, pkg.quantity)
     else:
-        pkgs = s.query(Package).filter(Package.pair==body.pair, Package.sold_at.is_(None)).all()
+        pkgs = s.query(Package).filter(Package.pair == body.pair, Package.sold_at.is_(None)).all()
         result = []
         for pkg in pkgs:
             result.append(market_sell_package(pkg.id, body.pair, pkg.quantity))
@@ -148,7 +161,7 @@ def get_pair_config():
 @app.put("/pair-config")
 def update_pair_config(body: PairCfgBody):
     s = get_session()
-    cfg = s.query(PairConfig).filter(PairConfig.pair==body.pair).first()
+    cfg = s.query(PairConfig).filter(PairConfig.pair == body.pair).first()
     if not cfg:
         cfg = PairConfig(pair=body.pair)
         s.add(cfg)
@@ -156,7 +169,8 @@ def update_pair_config(body: PairCfgBody):
         cfg.allowed = body.allowed
     if body.risk_level is not None:
         cfg.risk_level = max(0, min(10, body.risk_level))
-    s.commit(); s.close()
+    s.commit()
+    s.close()
     return {"pair": cfg.pair, "allowed": cfg.allowed, "risk_level": cfg.risk_level}
 
 @app.get("/logs")
@@ -177,18 +191,22 @@ def get_alerts(limit: int = 50):
 def clear_alerts():
     s = get_session()
     s.query(Alert).delete()
-    s.commit(); s.close()
+    s.commit()
+    s.close()
     return {"status": "ok"}
 
 @app.get("/market/history")
-def market_history(pair: str, limit: int = 100):
+async def get_market_history(pair: str, limit: int = 100):
     if not is_quote_allowed(pair):
         raise HTTPException(400, "Invalid pair")
-    points = last_points(pair, limit)
-    return {"pair": pair, "points": points}
+    with get_session() as session:
+        stmt = select(MarketData).where(MarketData.pair == pair).order_by(MarketData.ts.desc()).limit(limit)
+        result = session.execute(stmt).scalars().all()
+        return [{"pair": r.pair, "price": r.price, "timestamp": r.ts.isoformat()} for r in result]
 
 async def loop_task():
     global running, autotrade, last_alert
+    print("Starting loop_task")
     strat = SimpleStrategy(StrategyParams(
         min_profit_pct=settings.STRAT_MIN_PROFIT_PCT,
         hysteresis_pct=settings.STRAT_HYSTERESIS_PCT,
@@ -200,10 +218,11 @@ async def loop_task():
     ))
     while True:
         if running:
-            fetch_data_cycle()
+            print("Running fetch_data_cycle")
+            await fetch_data_cycle()
             if autotrade:
                 s = get_session()
-                pairs = s.query(PairConfig).filter(PairConfig.allowed==True).all()
+                pairs = s.query(PairConfig).filter(PairConfig.allowed == True).all()
                 s.close()
                 for cfg in pairs:
                     pair = cfg.pair
@@ -215,7 +234,7 @@ async def loop_task():
                     is_downtrend = price_now and ref_low and price_now < ref_low
                     will_buy, why, mult = strat.should_buy(pair, price_now or 0.0, ref_low or 0.0, tph, is_downtrend)
                     if will_buy and price_now:
-                        risk_scale = max(0.2, min(2.0, (risk_level+1)/5.0))
+                        risk_scale = max(0.2, min(2.0, (risk_level + 1) / 5.0))
                         quote_amt = settings.STRAT_BASE_PACKAGE_USD * mult * risk_scale
                         try:
                             market_buy_package(pair, quote_amt)
@@ -223,11 +242,11 @@ async def loop_task():
                         except Exception as e:
                             log(pair, f"Błąd kupna: {e}", "ERROR", strategy=strat.name)
                     s = get_session()
-                    open_pkgs = s.query(Package).filter(Package.pair==pair, Package.sold_at.is_(None)).all()
+                    open_pkgs = s.query(Package).filter(Package.pair == pair, Package.sold_at.is_(None)).all()
                     s.close()
                     total_qty = sum(p.quantity for p in open_pkgs) if open_pkgs else 0.0
                     if total_qty > 0 and price_now:
-                        entry_avg = sum(p.entry_price*p.quantity for p in open_pkgs)/total_qty
+                        entry_avg = sum(p.entry_price * p.quantity for p in open_pkgs) / total_qty
                         pnl_usd = (price_now - entry_avg) * total_qty
                         pnl_pct = (price_now - entry_avg) / entry_avg * 100.0 if entry_avg > 0 else 0.0
                         log(pair, f"PNL {pnl_usd:.2f} USD ({pnl_pct:.2f}%)", "INFO", pnl_usd=pnl_usd, pnl_percent=pnl_pct, strategy=strat.name)
@@ -242,8 +261,10 @@ async def loop_task():
                                 add_alert(pair, pnl_usd, pnl_pct, "negative")
                                 last['neg'] = now
                         last_alert[pair] = last
+        print(f"Sleeping for {settings.BOT_INTERVAL_SEC} seconds")
         await asyncio.sleep(settings.BOT_INTERVAL_SEC)
 
 @app.on_event("startup")
 async def on_start():
+    await init_pairs()
     asyncio.create_task(loop_task())

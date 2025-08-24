@@ -1,40 +1,46 @@
 from dataclasses import dataclass
-from typing import Literal, Tuple
 from datetime import datetime, timedelta
-from .pnl import latest_price, peak_since, last_tph
+from .pnl import peak_since, last_tph
+from .database import get_session
+from .models import Package
 
 @dataclass
 class StrategyParams:
-    min_profit_pct: float = 5.0
-    hysteresis_pct: float = 1.0
-    buy_drawdown_pct: float = 3.0
-    min_trades_per_hour: int = 100
-    base_package_usd: float = 50.0
-    downtrend_multiplier: float = 2.0
-    buy_lookback: Literal["day","week","month"] = "day"
+    min_profit_pct: float
+    hysteresis_pct: float
+    buy_drawdown_pct: float
+    min_trades_per_hour: int
+    base_package_usd: float
+    downtrend_multiplier: float
+    buy_lookback: str
 
 class SimpleStrategy:
-    name = "SIMPLE_MINPROFIT_HYST"
     def __init__(self, params: StrategyParams):
-        self.p = params
+        self.params = params
+        self.name = "SIMPLE_MINPROFIT_HYST"
 
-    def should_buy(self, pair: str, price_now: float, ref_low: float, trades_per_hour: int, is_downtrend: bool) -> Tuple[bool, str, float]:
-        if trades_per_hour < self.p.min_trades_per_hour:
-            return False, "Za mało transakcji/h", 0.0
-        if ref_low > 0:
-            dd = (price_now - ref_low) / ref_low * 100.0
-            if dd <= self.p.buy_drawdown_pct:
-                mult = self.p.downtrend_multiplier if is_downtrend else 1.0
-                return True, f"Cena blisko minimum ({self.p.buy_lookback}), dd={dd:.2f}%", mult
-        if is_downtrend:
-            return True, "Dokupka w downtrendzie", self.p.downtrend_multiplier
-        return False, "Warunki kupna niespełnione", 0.0
+    def should_buy(self, pair: str, price_now: float, ref_low: float, tph: float, is_downtrend: bool):
+        if price_now <= 0 or ref_low <= 0 or tph < self.params.min_trades_per_hour:
+            return False, "Invalid data or low trading activity", 1.0
 
-    def should_sell(self, price_now: float, entry_price: float, peak_since_entry: float):
-        growth_pct = (price_now - entry_price) / entry_price * 100.0
-        if growth_pct >= self.p.min_profit_pct:
-            drop_from_peak = (peak_since_entry - price_now) / peak_since_entry * 100.0 if peak_since_entry > 0 else 0.0
-            if drop_from_peak >= self.p.hysteresis_pct:
-                return True, f"Min zysk + histereza (spadek od szczytu {drop_from_peak:.2f}%)"
-            return False, "Min zysk, ale trend rosnący"
-        return False, "Za mały zysk"
+        # Sprawdź, czy cena jest najniższa w okresie lookback
+        drawdown = (ref_low - price_now) / ref_low * 100 if ref_low > 0 else 0
+        is_lowest = price_now <= ref_low  # Cena musi być najniższa, a nie tylko blisko minimum
+
+        # Sprawdź otwarte pakiety
+        s = get_session()
+        open_pkgs = s.query(Package).filter(Package.pair == pair, Package.sold_at.is_(None)).all()
+        s.close()
+
+        multiplier = 1.0
+        if open_pkgs:
+            # Jeśli mamy otwarte pakiety, zwiększ mnożnik
+            multiplier = self.params.downtrend_multiplier
+            # Sprawdź, czy cena jest niższa niż średnia cena wejścia
+            avg_entry = sum(p.entry_price * p.quantity for p in open_pkgs) / sum(p.quantity for p in open_pkgs)
+            if price_now >= avg_entry * (1 + self.params.hysteresis_pct / 100):
+                return False, f"Price above hysteresis threshold (avg_entry={avg_entry:.2f})", 1.0
+
+        if is_lowest and is_downtrend:
+            return True, f"Price at lowest in {self.params.buy_lookback}, dd={drawdown:.2f}%", multiplier
+        return False, f"Price not lowest in {self.params.buy_lookback}", 1.0

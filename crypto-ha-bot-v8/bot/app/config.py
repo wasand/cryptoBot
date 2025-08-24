@@ -27,8 +27,8 @@ class Settings:
     STRAT_BUY_DRAWDOWN_PCT = float(os.getenv("STRAT_BUY_DRAWDOWN_PCT","3.0"))
     STRAT_MIN_TRADES_PER_HOUR = int(os.getenv("STRAT_MIN_TRADES_PER_HOUR","100"))
     STRAT_BASE_PACKAGE_USD = float(os.getenv("STRAT_BASE_PACKAGE_USD","50.0"))
-    STRAT_DOWNTREND_MULTIPLIER = float(os.getenv("STRAT_DOWNTREND_MULTIPLIER","2.0"))
-    STRAT_BUY_LOOKBACK = os.getenv("STRAT_BUY_LOOKBACK","day").lower()
+    STRAT_DOWNTREND_MULTIPLIER = float(os.getenv("STRAT_DOWNTREND_MULTIPLIER","1.1"))
+    STRAT_BUY_LOOKBACK = os.getenv("STRAT_BUY_LOOKBACK","week").lower()
 
     ALERT_PNL_POSITIVE = float(os.getenv("ALERT_PNL_POSITIVE","10"))
     ALERT_PNL_NEGATIVE = float(os.getenv("ALERT_PNL_NEGATIVE","-5"))
@@ -38,5 +38,7 @@ class Settings:
 
     API_BIND = os.getenv("API_BIND","0.0.0.0")
     API_PORT = int(os.getenv("API_PORT","8000"))
-
+    
+    FX_PAIRS = ["USDEUR", "USDJPY"]
+    FX_INTERVAL_SEC = 60
 settings = Settings()

@@ -1,62 +1,40 @@
 from .binance_client import get_client
 from .database import get_session
-from .models import MarketData, FxRate, EquityPrice
-from .config import settings
-from .utils import ema, macd, atr
+from .models import MarketData
 from datetime import datetime
-import requests
-import yfinance as yf
+from .config import settings
+from sqlalchemy import insert
 import uuid
 
-def fetch_data_cycle():
-    batch_id = str(uuid.uuid4())
-    fetch_and_store_pairs(settings.DEFAULT_PAIRS, batch_id)
-    fetch_fx(batch_id)
-    fetch_equities(batch_id)
-
-def fetch_and_store_pairs(pairs: list[str], batch_id: str):
+def fetch_and_store_pairs(pairs, batch_id):
     client = get_client()
-    s = get_session()
-    for pair in pairs:
-        klines = client.klines(pair, '5m', limit=26)
-        if not klines:
-            continue
-        prices = [float(k[4]) for k in klines]
-        volumes = [float(k[5]) for k in klines]
-        trades_5m = int(klines[-1][8]) if len(klines[-1]) > 8 else 0
-        tph = trades_5m * 12
-        row = MarketData(
-            batch_id=batch_id, ts=datetime.utcnow(), pair=pair, price=prices[-1], volume=volumes[-1],
-            trades_per_hour=tph, ema_fast=ema(prices, 12), ema_slow=ema(prices, 26),
-            macd=macd(prices, 12, 26, 9), atr=atr(prices, 14)
-        )
-        s.add(row)
-    s.commit(); s.close()
+    with get_session() as session:
+        for pair in pairs:
+            try:
+                ticker = client.ticker_24hr(symbol=pair)  # Używamy ticker_24hr dla volume i count
+                session.execute(
+                    insert(MarketData),
+                    {
+                        "batch_id": batch_id,
+                        "ts": datetime.utcnow(),  # Używamy UTC dla spójności
+                        "pair": pair,
+                        "price": float(ticker["lastPrice"]),
+                        "volume": float(ticker["volume"]),
+                        "trades_per_hour": int(ticker["count"]) / 24,  # Obliczamy trades_per_hour
+                        "ema_fast": 0.0,
+                        "ema_slow": 0.0,
+                        "macd": 0.0,
+                        "atr": 0.0
+                    }
+                )
+                session.commit()
+                print(f"Stored data for {pair}: price={ticker['lastPrice']}, volume={ticker['volume']}, trades_per_hour={int(ticker['count']) / 24}")
+            except Exception as e:
+                print(f"Error fetching/storing data for {pair}: {e}")
 
-def fetch_fx(batch_id: str):
-    if not settings.FX_ENABLED:
-        return
-    url = "http://api.nbp.pl/api/exchangerates/tables/A?format=json"
-    try:
-        res = requests.get(url, timeout=10)
-        data = res.json()[0]["rates"]
-        rates = {r["code"]: r["mid"] for r in data if r["code"] in ["PLN", "EUR", "GBP", "CHF"]}
-        s = get_session()
-        for q, r in rates.items():
-            s.add(FxRate(batch_id=batch_id, base="USD", quote=q, rate=float(r)))
-        s.commit(); s.close()
-    except Exception as e:
-        print(f"FX fetch error: {e}")
-
-def fetch_equities(batch_id: str):
-    if not settings.EQUITIES_ENABLED:
-        return
-    symbols = ["BLK", "IVV", "VOO"]
-    s = get_session()
-    for sym in symbols:
-        ticker = yf.Ticker(sym)
-        data = ticker.history(period="1h")
-        if not data.empty:
-            price = data["Close"].iloc[-1]
-            s.add(EquityPrice(batch_id=batch_id, ts=datetime.utcnow(), symbol=sym, price=price))
-    s.commit(); s.close()
+async def fetch_data_cycle():
+    batch_id = str(uuid.uuid4())
+    pairs = settings.DEFAULT_PAIRS
+    print(f"Starting fetch_data_cycle with pairs: {pairs}")
+    fetch_and_store_pairs(pairs, batch_id)
+    print("Completed fetch_data_cycle")

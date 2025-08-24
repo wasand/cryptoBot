@@ -1,106 +1,104 @@
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import DateTime, Integer, String, Text, Boolean, Float, Date
-from datetime import datetime
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean
 from .database import Base
+
+class FXRate(Base):
+    __tablename__ = "fx_rates"
+    __table_args__ = {'extend_existing': True}
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    ts = Column(DateTime, nullable=False)
+    base = Column(String(8), nullable=False)
+    quote = Column(String(8), nullable=False)
+    rate = Column(Float, nullable=False)
 
 class MarketData(Base):
     __tablename__ = "market_data"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    batch_id: Mapped[str] = mapped_column(String(36), index=True)
-    ts: Mapped[datetime] = mapped_column(DateTime, index=True, default=datetime.utcnow)
-    pair: Mapped[str] = mapped_column(String(16), index=True)
-    price: Mapped[float] = mapped_column(Float)
-    volume: Mapped[float] = mapped_column(Float)
-    trades_per_hour: Mapped[int] = mapped_column(Integer, default=0)
-    ema_fast: Mapped[float | None] = mapped_column(Float, nullable=True)
-    ema_slow: Mapped[float | None] = mapped_column(Float, nullable=True)
-    macd: Mapped[float | None] = mapped_column(Float, nullable=True)
-    atr: Mapped[float | None] = mapped_column(Float, nullable=True)
+    __table_args__ = {'extend_existing': True}
+    id = Column(Integer, primary_key=True, index=True)
+    batch_id = Column(String(36))
+    ts = Column(DateTime)
+    pair = Column(String(16))
+    price = Column(Float)
+    volume = Column(Float)
+    trades_per_hour = Column(Integer)
+    ema_fast = Column(Float, nullable=True)
+    ema_slow = Column(Float, nullable=True)
+    macd = Column(Float, nullable=True)
+    atr = Column(Float, nullable=True)
 
 class Package(Base):
     __tablename__ = "packages"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    pair: Mapped[str] = mapped_column(String(16), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    quantity: Mapped[float] = mapped_column(Float)
-    entry_price: Mapped[float] = mapped_column(Float)
-    exit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
-    sold_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    realized_pnl_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
-    realized_pnl_pln: Mapped[float | None] = mapped_column(Float, nullable=True)
+    __table_args__ = {'extend_existing': True}
+    id = Column(Integer, primary_key=True, index=True)
+    pair = Column(String(16), index=True)
+    created_at = Column(DateTime)
+    quantity = Column(Float)
+    entry_price = Column(Float)
+    exit_price = Column(Float, nullable=True)
+    bought_at = Column(DateTime, nullable=True)
+    sold_at = Column(DateTime, nullable=True)
+    realized_pnl_usd = Column(Float, nullable=True)
+    realized_pnl_pln = Column(Float, nullable=True)
 
 class TradeLog(Base):
     __tablename__ = "trade_logs"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    ts: Mapped[datetime] = mapped_column(DateTime, index=True, default=datetime.utcnow)
-    level: Mapped[str] = mapped_column(String(16), default="INFO")
-    pair: Mapped[str] = mapped_column(String(16))
-    message: Mapped[str] = mapped_column(Text)
-    pnl_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
-    pnl_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
-    strategy: Mapped[str | None] = mapped_column(String(64), nullable=True)
-
-class PortfolioHistory(Base):
-    __tablename__ = "portfolio_history"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    ts: Mapped[datetime] = mapped_column(DateTime, index=True, default=datetime.utcnow)
-    total_value_pln: Mapped[float] = mapped_column(Float)
-    total_value_usd: Mapped[float] = mapped_column(Float)
-    realized_pnl_pln: Mapped[float] = mapped_column(Float)
-    unrealized_pnl_pln: Mapped[float] = mapped_column(Float)
-    realized_pnl_usd: Mapped[float] = mapped_column(Float)
-    unrealized_pnl_usd: Mapped[float] = mapped_column(Float)
-    strategy_name: Mapped[str | None] = mapped_column(String(64))
-    risk_level: Mapped[int | None] = mapped_column(Integer)
-    market: Mapped[str | None] = mapped_column(String(16))
-    volume_filter: Mapped[int | None] = mapped_column(Integer)
+    __table_args__ = {'extend_existing': True}
+    id = Column(Integer, primary_key=True, index=True)
+    ts = Column(DateTime, index=True)
+    pair = Column(String(16))
+    level = Column(String(16))
+    message = Column(String)
+    pnl_usd = Column(Float, nullable=True)
+    pnl_percent = Column(Float, nullable=True)
+    strategy = Column(String(32), nullable=True)
 
 class Alert(Base):
     __tablename__ = "alerts"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    ts: Mapped[datetime] = mapped_column(DateTime, index=True, default=datetime.utcnow)
-    pair: Mapped[str] = mapped_column(String(16), index=True)
-    pnl_usd: Mapped[float] = mapped_column(Float)
-    pnl_percent: Mapped[float] = mapped_column(Float)
-    type: Mapped[str] = mapped_column(String(16))
+    __table_args__ = {'extend_existing': True}
+    id = Column(Integer, primary_key=True, index=True)
+    ts = Column(DateTime)
+    pair = Column(String(16))
+    pnl_usd = Column(Float)
+    pnl_percent = Column(Float)
+    type = Column(String(16))
 
 class PairConfig(Base):
     __tablename__ = "pair_config"
-    pair: Mapped[str] = mapped_column(String(16), primary_key=True)
-    allowed: Mapped[bool] = mapped_column(Boolean, default=True)
-    risk_level: Mapped[int] = mapped_column(Integer, default=5)
-
-class FxRate(Base):
-    __tablename__ = "fx_rates"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    batch_id: Mapped[str] = mapped_column(String(36), index=True)
-    ts: Mapped[datetime] = mapped_column(DateTime, index=True, default=datetime.utcnow)
-    base: Mapped[str] = mapped_column(String(8))
-    quote: Mapped[str] = mapped_column(String(8))
-    rate: Mapped[float] = mapped_column(Float)
+    __table_args__ = {'extend_existing': True}
+    pair = Column(String(16), primary_key=True)
+    allowed = Column(Boolean)
+    risk_level = Column(Integer)
 
 class EquityPrice(Base):
     __tablename__ = "equity_prices"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    batch_id: Mapped[str] = mapped_column(String(36), index=True)
-    ts: Mapped[datetime] = mapped_column(DateTime, index=True, default=datetime.utcnow)
-    symbol: Mapped[str] = mapped_column(String(16), index=True)
-    price: Mapped[float] = mapped_column(Float)
-
-class StockPortfolio(Base):
-    __tablename__ = "stock_portfolios"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    batch_id: Mapped[str] = mapped_column(String(36), index=True)
-    fund_name: Mapped[str] = mapped_column(String(100))
-    symbol: Mapped[str] = mapped_column(String(16), index=True)
-    shares: Mapped[int] = mapped_column(Integer)
-    value_usd: Mapped[float] = mapped_column(Float)
-    report_date: Mapped[date] = mapped_column(Date)
+    __table_args__ = {'extend_existing': True}
+    id = Column(Integer, primary_key=True, index=True)
+    ts = Column(DateTime)
+    symbol = Column(String(16))
+    price = Column(Float)
 
 class MLFeature(Base):
     __tablename__ = "ml_features"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    batch_id: Mapped[str] = mapped_column(String(36), index=True)
-    ts: Mapped[datetime] = mapped_column(DateTime, index=True, default=datetime.utcnow)
-    feature_name: Mapped[str] = mapped_column(String(64))
-    value: Mapped[str] = mapped_column(Text)
+    __table_args__ = {'extend_existing': True}
+    id = Column(Integer, primary_key=True, index=True)
+    ts = Column(DateTime, index=True)
+    batch_id = Column(String(36), index=True)
+    feature_name = Column(String(32))
+    value = Column(String)
+
+class PortfolioHistory(Base):
+    __tablename__ = "portfolio_history"
+    __table_args__ = {'extend_existing': True}
+    id = Column(Integer, primary_key=True, index=True)
+    ts = Column(DateTime, index=True)
+    equity_usd = Column(Float)
+    total_pnl_usd = Column(Float)
+    total_pnl_percent = Column(Float)
+
+class StockPortfolio(Base):
+    __tablename__ = "stock_portfolios"
+    __table_args__ = {'extend_existing': True}
+    id = Column(Integer, primary_key=True, index=True)
+    batch_id = Column(String(36), index=True)
+    symbol = Column(String(16), index=True)
+    quantity = Column(Float)
+    avg_price = Column(Float)
